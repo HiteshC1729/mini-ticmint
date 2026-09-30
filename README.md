@@ -203,10 +203,12 @@ http://localhost:3000
 
 ### Register
 
+Registration requires a `role` of either `ORGANIZER` or `CUSTOMER`.
+
 bash
 curl -X POST http://localhost:3000/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"organizer@mini-ticmint.com","password":"password123"}'
+  -d '{"email":"organizer@mini-ticmint.com","password":"password123","role":"ORGANIZER"}'
 
 ### Login
 

@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { User } from '../../auth/user.entity';
 
 @Entity()
 export class Event {
@@ -7,6 +8,12 @@ export class Event {
 
   @Column()
   name: string;
+
+  @ManyToOne(() => User, (user) => user.events, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  organizer: User;
 }
 
 export class EventEntity {}

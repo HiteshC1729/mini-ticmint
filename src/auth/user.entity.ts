@@ -2,8 +2,16 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Event } from '../events/entities/event.entity';
+import { Reservation } from '../events/entities/reservation.entity';
+
+export enum UserRole {
+  ORGANIZER = 'ORGANIZER',
+  CUSTOMER = 'CUSTOMER',
+}
 
 @Entity()
 export class User {
@@ -16,9 +24,15 @@ export class User {
   @Column()
   password: string;
 
-  @Column()
-  role: string;
+  @Column({ type: 'varchar' })
+  role: UserRole;
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @OneToMany(() => Event, (event) => event.organizer)
+  events: Event[];
+
+  @OneToMany(() => Reservation, (reservation) => reservation.customer)
+  reservations: Reservation[];
 }

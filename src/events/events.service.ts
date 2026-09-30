@@ -1,13 +1,11 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Event } from './entities/event.entity';
 import { TicketType } from './entities/ticket-type.entity';
 import { CreateTicketTypeDto } from './dto/create-ticket-type.dto';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
-import { Reservation } from './entities/reservation.entity';
-import { CreateReservationDto } from './dto/create-reservation.dto';
 
 @Injectable()
 export class EventsService {
@@ -18,39 +16,37 @@ export class EventsService {
         @InjectRepository(TicketType)
         private readonly ticketTypeRepository: Repository<TicketType>,
 
-        @InjectRepository(Reservation)
-        private readonly reservationRepository: Repository<Reservation>,
-
-        private readonly dataSource: DataSource,
     ) { }
 
-    async createEvent(body: CreateEventDto) {
+    async createEvent(body: CreateEventDto, organizerId: number) {
         const event = this.eventRepository.create({
-            name: body.name
+            name: body.name,
+            organizer: { id: organizerId },
         });
         return this.eventRepository.save(event);
     }
 
-    async createTicketType(id: string, body: CreateTicketTypeDto) {
-        const event = await this.eventRepository.findOneBy({
-            id: Number(id),
-        });
-        if (!event) {
-            throw new NotFoundException('Event not found');
-        }
+    async createTicketType(id: string, body: CreateTicketTypeDto, organizerId: number) {
+        const event = await this.getOwnedEvent(id, organizerId);
 
         const ticketType = this.ticketTypeRepository.create({
             name: body.name,
             price: body.price,
             totalQuantity: body.totalQuantity,
             availableQuantity: body.totalQuantity,
-            event: { id: Number(id) },
+            event,
         });
         return this.ticketTypeRepository.save(ticketType);
     }
 
     getEvents() {
         return this.eventRepository.find();
+    }
+
+    getOrganizerEvents(organizerId: number) {
+        return this.eventRepository.find({
+            where: { organizer: { id: organizerId } },
+        });
     }
 
     async getEventById(id: string) {
@@ -81,13 +77,8 @@ export class EventsService {
         });
     }
 
-    async updateEvent(id: string, body: UpdateEventDto) {
-        const event = await this.eventRepository.findOneBy({
-            id: Number(id),
-        });
-        if (!event) {
-            throw new NotFoundException('Event not found');
-        }
+    async updateEvent(id: string, body: UpdateEventDto, organizerId: number) {
+        const event = await this.getOwnedEvent(id, organizerId);
 
         if (body.name !== undefined) {
             event.name = body.name;
@@ -98,13 +89,8 @@ export class EventsService {
         return event;
     }
 
-    async deleteEvent(id: string) {
-        const event = await this.eventRepository.findOneBy({
-            id: Number(id),
-        });
-        if (!event) {
-            throw new NotFoundException('Event Not Found');
-        }
+    async deleteEvent(id: string, organizerId: number) {
+        const event = await this.getOwnedEvent(id, organizerId);
 
         const ticketTypes = await this.ticketTypeRepository.find({
             where: {
@@ -125,5 +111,18 @@ export class EventsService {
             message: 'Event deleted successfully'
         };
     }
-}
 
+    private async getOwnedEvent(id: string, organizerId: number) {
+        const event = await this.eventRepository.findOne({
+            where: { id: Number(id) },
+            relations: { organizer: true },
+        });
+        if (!event) {
+            throw new NotFoundException('Event not found');
+        }
+        if (event.organizer.id !== organizerId) {
+            throw new ForbiddenException('You can only manage your own events');
+        }
+        return event;
+    }
+}

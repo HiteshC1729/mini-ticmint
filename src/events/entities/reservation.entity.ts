@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 
 import { TicketType } from './ticket-type.entity';
+import { User } from '../../auth/user.entity';
 
 @Entity()
 export class Reservation {
@@ -31,4 +32,13 @@ export class Reservation {
 
   @RelationId((reservation: Reservation) => reservation.ticketType)
   ticketTypeId: number;
+
+  @ManyToOne(() => User, (user) => user.reservations, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  customer: User;
+
+  @RelationId((reservation: Reservation) => reservation.customer)
+  customerId: number;
 }

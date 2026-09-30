@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
@@ -19,8 +20,10 @@ export class ReservationsService {
     ) { }
 
     async createReservation(
+        eventId: string,
         ticketTypeId: string,
         body: CreateReservationDto,
+        customerId: number,
     ) {
         const queryRunner = this.dataSource.createQueryRunner();
 
@@ -32,13 +35,17 @@ export class ReservationsService {
                 .getRepository(TicketType)
                 .createQueryBuilder('ticketType')
                 .setLock('pessimistic_write')
+                .innerJoin('ticketType.event', 'event')
                 .where('ticketType.id = :id', {
                     id: Number(ticketTypeId),
+                })
+                .andWhere('event.id = :eventId', {
+                    eventId: Number(eventId),
                 })
                 .getOne();
 
             if (!ticketType) {
-                throw new NotFoundException('Ticket type not found');
+                throw new NotFoundException('Ticket type not found for this event');
             }
 
             if (ticketType.availableQuantity < body.quantity) {
@@ -62,6 +69,7 @@ export class ReservationsService {
                         Date.now() + 15 * 60 * 1000,
                     ),
                     ticketType,
+                    customer: { id: customerId },
                 });
 
             await queryRunner.manager
@@ -79,7 +87,7 @@ export class ReservationsService {
         }
     }
 
-    async purchaseReservation(reservationId: string) {
+    async purchaseReservation(reservationId: string, customerId: number) {
         const queryRunner = this.dataSource.createQueryRunner();
 
         await queryRunner.connect();
@@ -98,6 +106,12 @@ export class ReservationsService {
             if (!reservation) {
                 throw new NotFoundException(
                     'Reservation not found',
+                );
+            }
+
+            if (reservation.customerId !== customerId) {
+                throw new ForbiddenException(
+                    'You can only purchase your own reservations',
                 );
             }
 
@@ -157,6 +171,27 @@ export class ReservationsService {
         } finally {
             await queryRunner.release();
         }
+    }
+
+    getCustomerReservations(customerId: number) {
+        return this.dataSource.getRepository(Reservation).find({
+            where: { customer: { id: customerId } },
+            relations: { ticketType: { event: true } },
+            order: { createdAt: 'DESC' },
+        });
+    }
+
+    getCustomerOrders(customerId: number) {
+        return this.dataSource
+            .getRepository(Order)
+            .createQueryBuilder('order')
+            .innerJoinAndSelect('order.reservation', 'reservation')
+            .innerJoinAndSelect('reservation.ticketType', 'ticketType')
+            .innerJoinAndSelect('ticketType.event', 'event')
+            .innerJoin('reservation.customer', 'customer')
+            .where('customer.id = :customerId', { customerId })
+            .orderBy('order.createdAt', 'DESC')
+            .getMany();
     }
 
     @Cron(CronExpression.EVERY_MINUTE)

@@ -1,118 +1,240 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Mini-Ticmint
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A backend-focused event ticketing system built with NestJS, TypeScript and PostgreSQL.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Mini-Ticmint models the core backend flow of an event-ticketing platform:
 
-## Description
+**User → Event → Ticket Type → Reservation → Order**
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+The project focuses on practical backend engineering problems involving ticket inventory, temporary reservations, concurrent requests, transactions and authentication.
 
-## Project setup
+## Features
 
-```bash
-$ npm install
-```
+- Event CRUD
+- Ticket type and inventory management
+- Temporary ticket reservations
+- Automatic reservation expiry
+- Inventory restoration after expiry
+- Purchase/order creation
+- JWT authentication
+- Password hashing with bcrypt
+- Request validation
+- PostgreSQL persistence
+- Database transactions
+- Pessimistic row locking
+- Concurrent reservation protection
+- Concurrent purchase protection
 
-## Compile and run the project
+## Tech Stack
 
-```bash
-# development
-$ npm run start
+- Node.js
+- TypeScript
+- NestJS
+- PostgreSQL
+- TypeORM
+- class-validator
+- JWT / Passport
+- bcrypt
+- Git / GitHub
 
-# watch mode
-$ npm run start:dev
+## Architecture
 
-# production mode
-$ npm run start:prod
-```
+Client
+  │
+  │ HTTP
+  ▼
+NestJS Controllers
+  │
+  ▼
+Services
+  │
+  ├── Authentication
+  ├── Event Management
+  └── Reservation / Purchase
+  │
+  ▼
+TypeORM
+  │
+  ▼
+PostgreSQL
 
-## Run tests
+## Core Flow
 
-```bash
-# unit tests
-$ npm run test
+Event
+  ↓
+Ticket Type
+  ↓
+Reservation
+  ├── Purchase → Order
+  └── Expiry → Inventory Restored
 
-# e2e tests
-$ npm run test:e2e
+## Concurrency Handling
 
-# test coverage
-$ npm run test:cov
-```
+Ticket inventory is a shared resource, so concurrent requests can cause overselling if they read and update inventory independently.
 
-## Deployment
+Mini-Ticmint uses PostgreSQL transactions with pessimistic row locking.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### Reservation
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+BEGIN
+  ↓
+Lock TicketType row
+  ↓
+Check inventory
+  ↓
+Decrease available quantity
+  ↓
+Create reservation
+  ↓
+COMMIT
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+### Purchase
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+BEGIN
+  ↓
+Lock Reservation row
+  ↓
+Check ACTIVE + not expired
+  ↓
+Create Order
+  ↓
+ACTIVE → PURCHASED
+  ↓
+COMMIT
 
-## Observability
+The purchase flow was tested with two simultaneous requests against the same reservation:
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+2 simultaneous requests
+        ↓
+1 → HTTP 201
+1 → HTTP 400
+        ↓
+Exactly 1 Order created
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+## Reservation Expiry
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+Reservations are held for 15 minutes.
 
-This project is already instrumented. Create a free account at [observe.nestjs.com](https://observe.nestjs.com), add an application, and paste the generated app key and secret into the `ObserveModule.forRoot()` call in `src/app.module.ts`.
+A scheduled job runs every minute and processes expired reservations.
 
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
+ACTIVE
+  │
+  ├── Purchase → PURCHASED
+  │
+  └── Timeout → EXPIRED
+                    ↓
+              Inventory Restored
 
-## Resources
+## Authentication
 
-Check out a few resources that may come in handy when working with NestJS:
+Authentication uses bcrypt for password hashing and JWT for authenticated requests.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Register
+   ↓
+Password hashed
+   ↓
+Login
+   ↓
+JWT issued
+   ↓
+Authorization: Bearer <token>
+   ↓
+Protected endpoint
 
-## Support
+Event creation requires authentication.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## API Endpoints
 
-## Stay in touch
+### Authentication
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+| Method | Endpoint         | Description           |
+| ------ | ---------------- | --------------------- |
+| POST   | `/auth/register` | Register a user       |
+| POST   | `/auth/login`    | Login and receive JWT |
 
-## License
+### Events
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+| Method | Endpoint      | Description                 |
+| ------ | ------------- | --------------------------- |
+| GET    | `/events`     | List events                 |
+| GET    | `/events/:id` | Get an event                |
+| POST   | `/events`     | Create event — JWT required |
+| PATCH  | `/events/:id` | Update an event             |
+| DELETE | `/events/:id` | Delete an event             |
+
+### Ticket Types
+
+| Method | Endpoint                   | Description        |
+| ------ | -------------------------- | ------------------ |
+| GET    | `/events/:id/ticket-types` | List ticket types  |
+| POST   | `/events/:id/ticket-types` | Create ticket type |
+
+### Reservations & Orders
+
+| Method | Endpoint                                              | Description          |
+| ------ | ----------------------------------------------------- | -------------------- |
+| POST   | `/events/:id/ticket-types/:ticketTypeId/reservations` | Reserve tickets      |
+| POST   | `/events/reservations/:reservationId/purchase`        | Purchase reservation |
+
+## Running Locally
+
+### Requirements
+
+* Node.js
+* PostgreSQL
+
+### Install
+
+bash
+npm install
+
+Make sure PostgreSQL is running and the `mini_ticmint` database exists.
+
+### Start
+
+bash
+npm run start:dev
+
+The API runs on:
+
+http://localhost:3000
+
+## Example Authentication
+
+### Register
+
+bash
+curl -X POST http://localhost:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"organizer@mini-ticmint.com","password":"password123"}'
+
+### Login
+
+bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"organizer@mini-ticmint.com","password":"password123"}'
+
+Use the returned JWT as:
+
+
+Authorization: Bearer <access_token>
+
+## Project Focus
+
+This project was built to understand practical backend engineering concepts including:
+
+* REST APIs
+* NestJS architecture
+* DTO validation
+* PostgreSQL relationships
+* Transactions
+* Row-level locking
+* Race conditions
+* Inventory consistency
+* Reservation state transitions
+* Scheduled background processing
+* JWT authentication
+* Concurrent request handling
+
+The project intentionally focuses on the core ticketing backend rather than reproducing the full architecture of a commercial ticketing platform.

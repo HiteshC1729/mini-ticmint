@@ -1,11 +1,13 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Event } from './entities/event.entity';
 import { TicketType } from './entities/ticket-type.entity';
 import { CreateTicketTypeDto } from './dto/create-ticket-type.dto';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
+import { Reservation } from './entities/reservation.entity';
+import { CreateReservationDto } from './dto/create-reservation.dto';
 
 @Injectable()
 export class EventsService {
@@ -15,6 +17,11 @@ export class EventsService {
 
         @InjectRepository(TicketType)
         private readonly ticketTypeRepository: Repository<TicketType>,
+
+        @InjectRepository(Reservation)
+        private readonly reservationRepository: Repository<Reservation>,
+
+        private readonly dataSource: DataSource,
     ) { }
 
     async createEvent(body: CreateEventDto) {
@@ -82,7 +89,7 @@ export class EventsService {
             throw new NotFoundException('Event not found');
         }
 
-        if (body.name !== undefined){
+        if (body.name !== undefined) {
             event.name = body.name;
         }
 
@@ -91,15 +98,15 @@ export class EventsService {
         return event;
     }
 
-    async deleteEvent (id: string) {
-        const event = await this.eventRepository.findOneBy ({
+    async deleteEvent(id: string) {
+        const event = await this.eventRepository.findOneBy({
             id: Number(id),
         });
         if (!event) {
             throw new NotFoundException('Event Not Found');
         }
 
-        const ticketTypes = await this.ticketTypeRepository.find ({
+        const ticketTypes = await this.ticketTypeRepository.find({
             where: {
                 event: {
                     id: Number(id),

@@ -11,6 +11,17 @@ import { ReservationsModule } from './reservations/reservations.module';
 import { Order } from './events/entities/order.entity';
 import { User } from './auth/user.entity';
 import { AuthModule } from './auth/auth.module';
+import { existsSync } from 'node:fs';
+
+if (existsSync('.env')) {
+  process.loadEnvFile('.env');
+}
+
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL must be set.');
+}
 
 @Module({
   controllers: [AppController],
@@ -22,10 +33,7 @@ import { AuthModule } from './auth/auth.module';
     AuthModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      username: 'hitesh',
-      database: 'mini_ticmint',
+      url: databaseUrl,
       entities: [Event, TicketType, Reservation, Order, User],
       synchronize: true,
     }),

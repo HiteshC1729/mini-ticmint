@@ -176,51 +176,10 @@ Event creation requires authentication.
 | POST   | `/events/:id/ticket-types/:ticketTypeId/reservations` | Reserve tickets      |
 | POST   | `/events/reservations/:reservationId/purchase`        | Purchase reservation |
 
-## Running Locally
-
 ### Requirements
 
 * Node.js
 * PostgreSQL
-
-### Install
-
-bash
-npm install
-
-Make sure PostgreSQL is running and the `mini_ticmint` database exists.
-
-### Start
-
-bash
-npm run start:dev
-
-The API runs on:
-
-http://localhost:3000
-
-## Example Authentication
-
-### Register
-
-Registration requires a `role` of either `ORGANIZER` or `CUSTOMER`.
-
-bash
-curl -X POST http://localhost:3000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"organizer@mini-ticmint.com","password":"password123","role":"ORGANIZER"}'
-
-### Login
-
-bash
-curl -X POST http://localhost:3000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"organizer@mini-ticmint.com","password":"password123"}'
-
-Use the returned JWT as:
-
-
-Authorization: Bearer <access_token>
 
 ## Project Focus
 
